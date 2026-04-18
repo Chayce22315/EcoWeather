@@ -6,6 +6,12 @@ struct CachedWeather: Codable {
     let outdoorCelsius: Double
     let humidityPercent: Double
     let fetchedAt: Date
+    /// WMO weather code when sourced from Open-Meteo (or mapped from OpenWeatherMap).
+    var wmoWeatherCode: Int?
+    /// Open-Meteo `is_day` (1 day / 0 night). Nil when unknown.
+    var isDay: Bool?
+    /// Recent precipitation in millimeters when available (Open-Meteo `precipitation`).
+    var precipitationMm: Double?
 }
 
 @MainActor
@@ -184,7 +190,7 @@ final class WeatherService: NSObject, ObservableObject {
             let tempF = (main?["temp"] as? Double) ?? 0
             let humidity = (main?["humidity"] as? Double) ?? 50
             let celsius = (tempF - 32) * 5 / 9
-            let decoded = CachedWeather(outdoorCelsius: celsius, humidityPercent: humidity, fetchedAt: Date())
+            let decoded = parseOpenWeatherMapCurrent(obj: obj, celsius: celsius, humidity: humidity)
             lastWeather = decoded
             lastFetchAt = Date()
             isStale = false
@@ -200,7 +206,7 @@ final class WeatherService: NSObject, ObservableObject {
         components.queryItems = [
             URLQueryItem(name: "latitude", value: String(coordinate.latitude)),
             URLQueryItem(name: "longitude", value: String(coordinate.longitude)),
-            URLQueryItem(name: "current", value: "temperature_2m,relative_humidity_2m"),
+            URLQueryItem(name: "current", value: "temperature_2m,relative_humidity_2m,weather_code,is_day,precipitation"),
             URLQueryItem(name: "daily", value: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"),
             URLQueryItem(name: "forecast_days", value: "10"),
             URLQueryItem(name: "timezone", value: "auto")
@@ -257,7 +263,18 @@ final class WeatherService: NSObject, ObservableObject {
         let current = obj?["current"] as? [String: Any]
         let temp = doubleValue(current?["temperature_2m"]) ?? 0
         let humidity = doubleValue(current?["relative_humidity_2m"]) ?? 50
-        let weather = CachedWeather(outdoorCelsius: temp, humidityPercent: humidity, fetchedAt: Date())
+        let wmo = intValue(current?["weather_code"])
+        let isDayInt = intValue(current?["is_day"])
+        let isDay: Bool? = isDayInt.map { $0 != 0 }
+        let precip = doubleValue(current?["precipitation"]) ?? 0
+        let weather = CachedWeather(
+            outdoorCelsius: temp,
+            humidityPercent: humidity,
+            fetchedAt: Date(),
+            wmoWeatherCode: wmo,
+            isDay: isDay,
+            precipitationMm: precip
+        )
         let daily = parseDailyForecast(from: obj) ?? []
         return (weather, daily)
     }
@@ -316,6 +333,54 @@ final class WeatherService: NSObject, ObservableObject {
         case let n as NSNumber: return n.doubleValue
         default: return nil
         }
+    }
+
+    private func intValue(_ any: Any?) -> Int? {
+        switch any {
+        case let i as Int: return i
+        case let d as Double: return Int(d.rounded())
+        case let n as NSNumber: return n.intValue
+        default: return nil
+        }
+    }
+
+    /// Map OpenWeatherMap `weather[].id` to a WMO-style code for shared scene logic.
+    private func wmoStyleCodeFromOpenWeatherId(_ id: Int) -> Int {
+        switch id {
+        case 200 ..< 300: return 95
+        case 300 ..< 400: return 55
+        case 500 ..< 600: return 65
+        case 600 ..< 700: return 75
+        case 700 ..< 800: return 45
+        case 800: return 0
+        case 801: return 1
+        case 802: return 2
+        case 803, 804: return 3
+        default: return 2
+        }
+    }
+
+    private func parseOpenWeatherMapCurrent(obj: [String: Any]?, celsius: Double, humidity: Double) -> CachedWeather {
+        let weatherArr = obj?["weather"] as? [[String: Any]]
+        let firstId = weatherArr?.compactMap { intValue($0["id"]) }.first
+        let wmo = firstId.map { wmoStyleCodeFromOpenWeatherId($0) }
+
+        var isDay: Bool?
+        if let sys = obj?["sys"] as? [String: Any],
+           let dt = intValue(obj?["dt"]),
+           let sunrise = intValue(sys["sunrise"]),
+           let sunset = intValue(sys["sunset"]) {
+            isDay = dt >= sunrise && dt < sunset
+        }
+
+        return CachedWeather(
+            outdoorCelsius: celsius,
+            humidityPercent: humidity,
+            fetchedAt: Date(),
+            wmoWeatherCode: wmo,
+            isDay: isDay,
+            precipitationMm: nil
+        )
     }
 
     private func requestCoordinate() async -> CLLocationCoordinate2D? {

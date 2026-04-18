@@ -6,14 +6,29 @@ struct DashboardView: View {
     @AppStorage("eco_notifications_enabled") private var notificationsEnabled = true
     @State private var showDetail = false
     @State private var showDebug = false
+    @State private var selectedScene: WeatherSceneKind = .live
 
     private var useUS: Bool { Locale.current.measurementSystem == .us }
 
+    private var liveDerivedScene: WeatherSceneKind {
+        guard let w = appModel.weather.lastWeather else { return .live }
+        let code = w.wmoWeatherCode ?? 2
+        let isDay = w.isDay ?? true
+        let precip = w.precipitationMm ?? 0
+        return WeatherSceneKind.fromLive(wmoCode: code, isDay: isDay, precipitationMm: precip)
+    }
+
+    private var effectiveScene: WeatherSceneKind {
+        selectedScene == .live ? liveDerivedScene : selectedScene
+    }
+
     var body: some View {
         ZStack {
-            backgroundLayer
+            WeatherSkyBackground(scene: effectiveScene)
+            skyTintOverlay
             ScrollView {
                 VStack(spacing: 20) {
+                    weatherSceneTabs
                     heroHeader
                     tenDaySection
                     notificationSection
@@ -43,6 +58,7 @@ struct DashboardView: View {
             }
             cornerDebugTriggers
         }
+        .animation(.easeInOut(duration: 0.55), value: effectiveScene)
         .task {
             await EcoNotificationService.shared.refreshAuthorizationStatus()
             await appModel.refresh()
@@ -57,22 +73,70 @@ struct DashboardView: View {
         }
     }
 
-    private var backgroundLayer: some View {
+    private var skyTintOverlay: some View {
         ZStack {
             LinearGradient(
                 colors: [
-                    appModel.carbonTintColor().opacity(0.35),
-                    Color.black.opacity(0.2)
+                    appModel.carbonTintColor().opacity(0.22),
+                    Color.clear
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            .ignoresSafeArea()
             Rectangle()
-                .fill(.ultraThinMaterial)
-                .ignoresSafeArea()
+                .fill(.thinMaterial)
+                .opacity(0.35)
         }
+        .ignoresSafeArea()
         .animation(.easeInOut(duration: 0.6), value: appModel.decision?.recommendationLevel ?? -1)
+    }
+
+    private var weatherSceneTabs: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Sky preview")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(WeatherSceneKind.allCases) { scene in
+                        sceneTabButton(scene)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+        .padding(12)
+        .liquidGlassCard(cornerRadius: 14)
+    }
+
+    private func sceneTabButton(_ scene: WeatherSceneKind) -> some View {
+        let on = selectedScene == scene
+        return Button {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                selectedScene = scene
+            }
+        } label: {
+            Text(scene.shortTitle)
+                .font(.caption.weight(on ? .semibold : .regular))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background {
+                    if on {
+                        Capsule(style: .continuous)
+                            .fill(.thickMaterial)
+                    } else {
+                        Capsule(style: .continuous)
+                            .fill(Color.white.opacity(0.12))
+                    }
+                }
+                .overlay {
+                    Capsule(style: .continuous)
+                        .strokeBorder(Color.white.opacity(on ? 0.45 : 0.2), lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
     }
 
     private var heroHeader: some View {
@@ -110,6 +174,15 @@ struct DashboardView: View {
                 Text(String(format: "Humidity %.0f%%", w.humidityPercent))
                     .font(.caption)
                     .foregroundStyle(.tertiary)
+                if selectedScene == .live {
+                    Text(liveConditionLine(for: w))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Preview: \(effectiveScene.shortTitle)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             } else {
                 Text("Waiting for GPS + weather…")
                     .font(.title2)
@@ -122,7 +195,19 @@ struct DashboardView: View {
                 .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 8)
+        .padding(16)
+        .liquidGlassCard()
+    }
+
+    private func liveConditionLine(for w: CachedWeather) -> String {
+        let code = w.wmoWeatherCode
+        let isDay = w.isDay
+        if let code {
+            let headline = DailyForecastDay.wmoHeadline(code: code)
+            let dayNight = isDay == false ? "Night" : "Day"
+            return "\(headline) · \(dayNight)"
+        }
+        return "Conditions appear after the next refresh."
     }
 
     private var cityHeadline: String {
@@ -157,7 +242,7 @@ struct DashboardView: View {
             }
         }
         .padding()
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .liquidGlassCard()
     }
 
     private func dayCard(_ day: DailyForecastDay) -> some View {
@@ -185,11 +270,15 @@ struct DashboardView: View {
         }
         .frame(width: 132, alignment: .leading)
         .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
-        )
+        .background {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.regularMaterial)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.35), lineWidth: 0.75)
+            }
+            .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+        }
     }
 
     private func formattedOutdoor(fromCelsius c: Double) -> String {
@@ -226,7 +315,7 @@ struct DashboardView: View {
             }
         }
         .padding()
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .liquidGlassCard(cornerRadius: 12)
     }
 
     private var recommendation: some View {
@@ -236,7 +325,7 @@ struct DashboardView: View {
                 .multilineTextAlignment(.center)
         }
         .padding()
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .liquidGlassCard()
     }
 
     private var statusRow: some View {
@@ -256,7 +345,7 @@ struct DashboardView: View {
             }
         }
         .padding()
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .liquidGlassCard(cornerRadius: 12)
     }
 
     private var carbonLabel: String {
