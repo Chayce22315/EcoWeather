@@ -75,8 +75,8 @@ enum WeatherSceneKind: String, CaseIterable, Identifiable {
             return night ? .nightThunderstorm : .thunderstorm
         }
 
-        let rainCodes = (51 ... 67).union(80 ... 82)
-        if rainCodes.contains(wmoCode) || (71 ... 77).contains(wmoCode) || [85, 86].contains(wmoCode) {
+        let isRainCode = (51 ... 67).contains(wmoCode) || (80 ... 82).contains(wmoCode)
+        if isRainCode || (71 ... 77).contains(wmoCode) || [85, 86].contains(wmoCode) {
             return night ? .nightRain : .rain
         }
 

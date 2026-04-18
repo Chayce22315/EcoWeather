@@ -138,7 +138,6 @@ struct WeatherSkyBackground: View {
         scale: CGFloat
     ) {
         let baseY = size.height * CGFloat(0.18 + Double(scale) * 0.1)
-        let w = size.width * scale * 1.05
         let h = size.height * 0.13 * scale
         let r = h * 0.55
         let strideX = r * 4.2
