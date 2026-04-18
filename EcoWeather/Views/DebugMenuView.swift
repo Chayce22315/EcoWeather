@@ -4,6 +4,7 @@ struct DebugMenuView: View {
     @EnvironmentObject private var appModel: AppViewModel
     @Environment(\.dismiss) private var dismiss
     @AppStorage("electricitymaps_token") private var token: String = ""
+    @AppStorage("openweathermap_api_key") private var openWeatherKey: String = ""
 
     private var buildMetadata: BuildMetadata? {
         BuildMetadata.loadFromBundle()
@@ -31,6 +32,13 @@ struct DebugMenuView: View {
                 Section("Electricity Maps token") {
                     SecureField("auth-token", text: $token)
                     Text("Stored in UserDefaults only on-device.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("OpenWeatherMap (optional)") {
+                    SecureField("API key", text: $openWeatherKey)
+                    Text("If set, live conditions use api.openweathermap.org for your GPS position (°F). Leave empty to use Open-Meteo (no key).")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

@@ -30,12 +30,16 @@ struct DecisionOrbView: View {
                 .fill(.ultraThinMaterial)
                 .frame(width: 200, height: 200)
                 .overlay {
-                    VStack(spacing: 8) {
+                    VStack(spacing: 6) {
                         Text(scoreText)
                             .font(.system(size: 44, weight: .bold, design: .rounded))
-                        Text("Eco score")
-                            .font(.footnote)
+                        Text("Ventilation fit")
+                            .font(.subheadline.weight(.semibold))
+                        Text("How good it is to open windows vs run AC (higher = more favor open windows).")
+                            .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 12)
                     }
                 }
         }

@@ -9,15 +9,15 @@ struct DetailPanelView: View {
             List {
                 Section("Temperature") {
                     LabeledContent("Outdoor") {
-                        Text(String(format: "%.1f°C", appModel.lastOutdoor))
+                        Text(outdoorFormatted)
                     }
                     LabeledContent("Indoor (assumed)") {
                         Stepper(value: $appModel.indoorCelsius, in: 10 ... 32, step: 0.5) {
-                            Text(String(format: "%.1f°C", appModel.indoorCelsius))
+                            Text(indoorFormatted)
                         }
                     }
                     LabeledContent("Delta") {
-                        Text(String(format: "%.1f°C", appModel.lastOutdoor - appModel.indoorCelsius))
+                        Text(deltaFormatted)
                     }
                 }
 
@@ -67,5 +67,26 @@ struct DetailPanelView: View {
                 }
             }
         }
+    }
+
+    private var useUS: Bool { Locale.current.measurementSystem == .us }
+
+    private var outdoorFormatted: String { formatTemp(appModel.lastOutdoor) }
+    private var indoorFormatted: String { formatTemp(appModel.indoorCelsius) }
+
+    private var deltaFormatted: String {
+        if useUS {
+            let fOut = appModel.lastOutdoor * 9 / 5 + 32
+            let fIn = appModel.indoorCelsius * 9 / 5 + 32
+            return String(format: "%.0f°F", fOut - fIn)
+        }
+        return String(format: "%.1f°C", appModel.lastOutdoor - appModel.indoorCelsius)
+    }
+
+    private func formatTemp(_ celsius: Double) -> String {
+        if useUS {
+            return String(format: "%.0f°F", celsius * 9 / 5 + 32)
+        }
+        return String(format: "%.1f°C", celsius)
     }
 }

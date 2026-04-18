@@ -25,12 +25,12 @@ final class AppViewModel: ObservableObject {
         bannerMessage = nil
         defer { isLoading = false }
 
-        await weather.refreshWeatherIfNeeded()
+        await weather.refreshWeather()
         if let w = weather.lastWeather {
             lastOutdoor = w.outdoorCelsius
             lastHumidity = w.humidityPercent
         }
-        lastCoordinate = weather.lastCoordinate
+        lastCoordinate = weather.coordinateForCarbon
 
         let region = Locale.current.region?.identifier ?? "US"
         let co2 = await carbon.refreshCarbon(coordinate: lastCoordinate, isoRegion: region)
@@ -53,6 +53,9 @@ final class AppViewModel: ObservableObject {
         weatherStale = weather.isStale
         if weather.isStale {
             bannerMessage = "Weather data may be stale or from cache."
+        }
+        if let err = weather.lastError, !err.isEmpty {
+            bannerMessage = [bannerMessage, err].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
         }
         if carbon.usedFallback {
             bannerMessage = (bannerMessage ?? "") + (bannerMessage == nil ? "" : " ") + "Carbon data used fallback or cache."

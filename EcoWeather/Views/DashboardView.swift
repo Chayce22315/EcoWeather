@@ -75,9 +75,14 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("EcoWeather")
                 .font(.largeTitle.bold())
+            Text(appModel.weather.locationStatusLine)
+                .font(.caption)
+                .foregroundStyle(.secondary)
             if let w = appModel.weather.lastWeather {
-                HStack {
-                    Text(String(format: "%.1f°C outside", w.outdoorCelsius))
+                HStack(alignment: .firstTextBaseline) {
+                    Text(formattedOutdoor(fromCelsius: w.outdoorCelsius))
+                    Text("outside")
+                        .foregroundStyle(.secondary)
                     if appModel.weatherStale {
                         Text("Stale")
                             .font(.caption2)
@@ -88,11 +93,19 @@ struct DashboardView: View {
                 }
                 .font(.headline)
             } else {
-                Text("Waiting for weather…")
+                Text("Waiting for GPS + weather…")
                     .foregroundStyle(.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func formattedOutdoor(fromCelsius c: Double) -> String {
+        if Locale.current.measurementSystem == .us {
+            let f = c * 9 / 5 + 32
+            return String(format: "%.0f°F", f)
+        }
+        return String(format: "%.1f°C", c)
     }
 
     private var notificationSection: some View {
