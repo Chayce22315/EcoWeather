@@ -2,6 +2,8 @@ import SwiftUI
 
 struct DashboardView: View {
     @EnvironmentObject private var appModel: AppViewModel
+    @ObservedObject private var notifications = EcoNotificationService.shared
+    @AppStorage("eco_notifications_enabled") private var notificationsEnabled = true
     @State private var showDetail = false
     @State private var showDebug = false
 
@@ -11,6 +13,7 @@ struct DashboardView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     header
+                    notificationSection
                     DecisionOrbView()
                         .onTapGesture {
                             showDetail = true
@@ -37,6 +40,7 @@ struct DashboardView: View {
             cornerDebugTriggers
         }
         .task {
+            await EcoNotificationService.shared.refreshAuthorizationStatus()
             await appModel.refresh()
         }
         .sheet(isPresented: $showDetail) {
@@ -89,6 +93,35 @@ struct DashboardView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var notificationSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: $notificationsEnabled) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Eco alerts")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Banners when ventilation is ideal or grid carbon is high.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .onChange(of: notificationsEnabled) { _, new in
+                EcoNotificationService.shared.notificationsEnabled = new
+                if new {
+                    Task {
+                        _ = await EcoNotificationService.shared.requestAuthorization()
+                    }
+                }
+            }
+            if notifications.authorizationStatus == .denied {
+                Text("Notifications are off for EcoWeather — enable them in Settings to see alerts.")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            }
+        }
+        .padding()
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private var recommendation: some View {

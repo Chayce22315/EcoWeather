@@ -40,12 +40,15 @@ final class AppViewModel: ObservableObject {
         let indoor = Float(indoorCelsius)
         let humidity = Float(lastHumidity)
 
+        let previousDecision = decision
         decision = engine.computeDecision(
             withOutdoorTemp: outdoor,
             indoorTemp: indoor,
             humidity: humidity,
             co2Intensity: Float(co2)
         )
+
+        EcoNotificationService.shared.evaluateDecisionChange(previous: previousDecision, current: decision)
 
         weatherStale = weather.isStale
         if weather.isStale {
