@@ -1,0 +1,102 @@
+name: Build unsigned IPA
+
+on:
+  push:
+    branches: [main, "release/**"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Resolve carbon commit (optional)
+        id: carbon
+        env:
+          ELECTRICITYMAP_TOKEN: ${{ secrets.ELECTRICITYMAP_TOKEN }}
+        run: |
+          COMMIT="UNKNOWN"
+          if [ -n "${ELECTRICITYMAP_TOKEN:-}" ]; then
+            RESP=$(curl -sS -H "auth-token: ${ELECTRICITYMAP_TOKEN}" \
+              "https://api.electricitymap.org/v3/carbon-intensity/latest?lat=40.7128&lon=-74.0060" || true)
+            CI=$(echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('carbonIntensity') or d.get('data',{}).get('carbonIntensity') or '')" 2>/dev/null || echo "")
+            if [ -n "$CI" ] && [ "$CI" != "None" ]; then
+              COMMIT=$(python3 -c "ci=float('$CI'); print('LOW' if ci<150 else 'MEDIUM' if ci<=400 else 'HIGH')")
+            fi
+          fi
+          echo "carbon_commit=$COMMIT" >> "$GITHUB_OUTPUT"
+          echo "Resolved carbon commit: $COMMIT"
+
+      - name: Write build_metadata.json
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+          CARBON_COMMIT: ${{ steps.carbon.outputs.carbon_commit || 'UNKNOWN' }}
+        run: |
+          export BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          python3 - <<'PY'
+          import json, os, pathlib
+          cc = (os.environ.get("CARBON_COMMIT") or "").strip() or "UNKNOWN"
+          meta = {
+            "build_time": os.environ["BUILD_TIME"],
+            "run_number": int(os.environ["RUN_NUMBER"]),
+            "carbon_commit": cc,
+          }
+          path = pathlib.Path("EcoWeather/Resources/build_metadata.json")
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(meta, indent=2))
+          print(path.read_text())
+          PY
+
+      - name: Archive (unsigned)
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project EcoWeather.xcodeproj \
+            -scheme EcoWeather \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/EcoWeather.xcarchive" \
+            CURRENT_PROJECT_VERSION="$RUN_NUMBER" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            archive
+
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          ARCH="$RUNNER_TEMP/EcoWeather.xcarchive"
+          APP_PATH="$ARCH/Products/Applications/EcoWeather.app"
+          if [ ! -d "$APP_PATH" ]; then
+            APP_PATH=$(find "$ARCH" -name "EcoWeather.app" -type d | head -n1)
+          fi
+          test -d "$APP_PATH"
+          rm -rf Payload EcoWeather.ipa
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          zip -r EcoWeather.ipa Payload
+          ls -la EcoWeather.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EcoWeather-unsigned
+          path: EcoWeather.ipa
+
+      - name: Build summary
+        run: |
+          {
+            echo "## EcoWeather unsigned build"
+            echo "- GitHub run number: ${{ github.run_number }}"
+            echo
+            echo '```json'
+            cat EcoWeather/Resources/build_metadata.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
