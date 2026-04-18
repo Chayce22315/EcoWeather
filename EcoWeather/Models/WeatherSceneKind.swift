@@ -63,6 +63,16 @@ enum WeatherSceneKind: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Light droplets on glass (no full rain layer).
+    var showsMistOnGlass: Bool {
+        switch self {
+        case .partlyCloudy, .nightPartlyCloudy, .cloudy, .nightCloudy:
+            return true
+        default:
+            return false
+        }
+    }
+
     /// Derive a scene from Open-Meteo-style fields (WMO code, is_day, optional precip mm).
     static func fromLive(wmoCode: Int, isDay: Bool, precipitationMm: Double) -> WeatherSceneKind {
         let night = !isDay

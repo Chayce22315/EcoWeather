@@ -26,6 +26,8 @@
 		E20000000000000000000013 /* WeatherSceneKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30000000000000000000016 /* WeatherSceneKind.swift */; };
 		E20000000000000000000014 /* LiquidGlassChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30000000000000000000017 /* LiquidGlassChrome.swift */; };
 		E20000000000000000000015 /* WeatherSkyBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30000000000000000000018 /* WeatherSkyBackground.swift */; };
+		E20000000000000000000016 /* WeatherReactiveEffects.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30000000000000000000019 /* WeatherReactiveEffects.swift */; };
+		E20000000000000000000017 /* ForecastCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3000000000000000000001A /* ForecastCalendarView.swift */; };
 		E2000000000000000000000E /* build_metadata.json in Resources */ = {isa = PBXBuildFile; fileRef = E30000000000000000000011 /* build_metadata.json */; };
 		E2000000000000000000000F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E30000000000000000000012 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -52,6 +54,8 @@
 		E30000000000000000000016 /* WeatherSceneKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherSceneKind.swift; sourceTree = "<group>"; };
 		E30000000000000000000017 /* LiquidGlassChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassChrome.swift; sourceTree = "<group>"; };
 		E30000000000000000000018 /* WeatherSkyBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherSkyBackground.swift; sourceTree = "<group>"; };
+		E30000000000000000000019 /* WeatherReactiveEffects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherReactiveEffects.swift; sourceTree = "<group>"; };
+		E3000000000000000000001A /* ForecastCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForecastCalendarView.swift; sourceTree = "<group>"; };
 		E30000000000000000000010 /* EcoWeather-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "EcoWeather-Bridging-Header.h"; sourceTree = "<group>"; };
 		E30000000000000000000011 /* build_metadata.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = build_metadata.json; sourceTree = "<group>"; };
 		E30000000000000000000012 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -152,6 +156,8 @@
 				E3000000000000000000000F /* DebugMenuView.swift */,
 				E30000000000000000000017 /* LiquidGlassChrome.swift */,
 				E30000000000000000000018 /* WeatherSkyBackground.swift */,
+				E30000000000000000000019 /* WeatherReactiveEffects.swift */,
+				E3000000000000000000001A /* ForecastCalendarView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -253,6 +259,8 @@
 				E20000000000000000000013 /* WeatherSceneKind.swift in Sources */,
 				E20000000000000000000014 /* LiquidGlassChrome.swift in Sources */,
 				E20000000000000000000015 /* WeatherSkyBackground.swift in Sources */,
+				E20000000000000000000016 /* WeatherReactiveEffects.swift in Sources */,
+				E20000000000000000000017 /* ForecastCalendarView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

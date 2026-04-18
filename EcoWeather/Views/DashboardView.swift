@@ -30,6 +30,8 @@ struct DashboardView: View {
                 VStack(spacing: 20) {
                     weatherSceneTabs
                     heroHeader
+                    ForecastCalendarView(days: appModel.weather.dailyForecast, useFahrenheit: useUS)
+                        .weatherAtmosphere()
                     tenDaySection
                     notificationSection
                     DecisionOrbView()
@@ -52,6 +54,7 @@ struct DashboardView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(appModel.isLoading)
+                    .weatherAtmosphere()
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 24)
@@ -71,6 +74,7 @@ struct DashboardView: View {
             DebugMenuView()
                 .environmentObject(appModel)
         }
+        .weatherSceneEnvironment(effectiveScene)
     }
 
     private var skyTintOverlay: some View {
@@ -107,6 +111,7 @@ struct DashboardView: View {
         }
         .padding(12)
         .liquidGlassCard(cornerRadius: 14)
+        .weatherAtmosphere()
     }
 
     private func sceneTabButton(_ scene: WeatherSceneKind) -> some View {
@@ -197,6 +202,7 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .liquidGlassCard()
+        .weatherAtmosphere()
     }
 
     private func liveConditionLine(for w: CachedWeather) -> String {
@@ -243,6 +249,7 @@ struct DashboardView: View {
         }
         .padding()
         .liquidGlassCard()
+        .weatherAtmosphere()
     }
 
     private func dayCard(_ day: DailyForecastDay) -> some View {
@@ -316,6 +323,7 @@ struct DashboardView: View {
         }
         .padding()
         .liquidGlassCard(cornerRadius: 12)
+        .weatherAtmosphere()
     }
 
     private var recommendation: some View {
@@ -326,6 +334,7 @@ struct DashboardView: View {
         }
         .padding()
         .liquidGlassCard()
+        .weatherAtmosphere()
     }
 
     private var statusRow: some View {
@@ -346,6 +355,7 @@ struct DashboardView: View {
         }
         .padding()
         .liquidGlassCard(cornerRadius: 12)
+        .weatherAtmosphere()
     }
 
     private var carbonLabel: String {

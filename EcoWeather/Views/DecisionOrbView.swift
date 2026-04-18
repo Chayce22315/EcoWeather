@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DecisionOrbView: View {
     @EnvironmentObject private var appModel: AppViewModel
+    @Environment(\.weatherScene) private var weatherScene
     @State private var pulse = false
 
     var body: some View {
@@ -43,8 +44,10 @@ struct DecisionOrbView: View {
                     }
                 }
         }
+        .weatherAtmosphere()
         .onAppear { pulse = true }
         .animation(.easeInOut(duration: 0.6), value: appModel.decision?.recommendationLevel ?? -1)
+        .animation(.easeInOut(duration: 0.45), value: weatherScene)
     }
 
     private var scoreText: String {
