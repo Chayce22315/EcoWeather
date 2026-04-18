@@ -88,36 +88,45 @@ private struct RainOnGlassOverlay: View {
     var intensity: CGFloat = 1
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 20, paused: false)) { timeline in
-            Canvas { context, size in
+        GeometryReader { geo in
+            let w = max(geo.size.width, 1)
+            let h = max(geo.size.height, 1)
+            let seed32 = UInt32(truncatingIfNeeded: seed)
+            TimelineView(.animation(minimumInterval: 1 / 24, paused: false)) { timeline in
                 let t = timeline.date.timeIntervalSinceReferenceDate
-                let count = max(4, Int(14 * intensity))
-                for i in 0 ..< count {
-                    let u = unitRandom(i * 3 + seed)
-                    let v = unitRandom(i * 7 + seed &* 13)
-                    let x = u * size.width
-                    let baseY = v * size.height
-                    let drift = (t * (22 + Double(i % 5)) + Double(seed % 17) * 0.1).truncatingRemainder(dividingBy: 1)
-                    let y = (baseY + drift * (size.height + 20)).truncatingRemainder(dividingBy: size.height + 20) - 6
-                    let w: CGFloat = (2 + CGFloat(i % 3) * 0.4) * intensity
-                    let h: CGFloat = (5 + CGFloat(i % 4)) * CGFloat(sqrt(Double(intensity)))
-                    let rect = CGRect(x: x, y: y, width: max(w, 1), height: max(h, 2))
-                    let path = Path(roundedRect: rect, cornerRadius: rect.width / 2)
-                    let baseOp = (0.1 + Double(i % 3) * 0.04) * Double(intensity)
-                    context.fill(path, with: .color(Color.white.opacity(baseOp)))
-                    if i % 4 == 0 {
-                        let blob = Path(ellipseIn: CGRect(x: x - 1, y: y - 3, width: w + 2, height: w + 2))
-                        context.fill(blob, with: .color(Color.white.opacity(0.14 * Double(intensity))))
+                Canvas { context, size in
+                    let count = max(6, Int(22 * intensity))
+                    for i in 0 ..< count {
+                        let u = hash01(UInt32(i &* 0x85EBCA6B), seed: seed32 &+ UInt32(i << 1))
+                        let v = hash01(UInt32(i &* 0xC2B2AE35), seed: seed32 &+ UInt32(i &+ 999))
+                        let x = u * size.width
+                        let baseY = v * size.height
+                        let speed = 0.65 + Double(hash01(UInt32(i), seed: seed32 &+ 7)) * 0.55
+                        let drift = (t * speed * 18 + Double(hash01(UInt32(i &+ 3), seed: seed32)) * 20).truncatingRemainder(dividingBy: 1)
+                        let y = (baseY + CGFloat(drift) * (size.height + 24)).truncatingRemainder(dividingBy: size.height + 24) - 8
+                        let dropW = (1.2 + CGFloat(i % 4) * 0.35) * intensity
+                        let dropH = (4 + CGFloat(i % 5)) * CGFloat(sqrt(Double(intensity)))
+                        let rect = CGRect(x: x, y: y, width: max(dropW, 0.8), height: max(dropH, 2))
+                        let path = Path(roundedRect: rect, cornerRadius: rect.width / 2)
+                        let baseOp = (0.09 + Double(i % 4) * 0.028) * Double(intensity)
+                        context.fill(path, with: .color(Color.white.opacity(baseOp)))
+                        if i % 5 == 0 {
+                            let blob = Path(ellipseIn: CGRect(x: x - 0.5, y: y - 2, width: dropW + 1.5, height: dropW + 1.2))
+                            context.fill(blob, with: .color(Color.white.opacity(0.12 * Double(intensity))))
+                        }
                     }
                 }
+                .frame(width: w, height: h)
             }
-            .allowsHitTesting(false)
         }
+        .allowsHitTesting(false)
     }
 
-    private func unitRandom(_ salt: Int) -> CGFloat {
-        let x = sin(Double(salt) * 12.9898 + 78.233) * 43758.5453
-        let f = x - floor(x)
-        return CGFloat(f)
+    private func hash01(_ i: UInt32, seed: UInt32) -> CGFloat {
+        var x = UInt64(i) &* 0x9E3779B97F4A7C15 &+ UInt64(seed)
+        x ^= x >> 33
+        x &*= 0xff51afd7ed558ccd
+        x ^= x >> 33
+        return CGFloat(Double(x & 0xFFFF_FFFF) / Double(0xFFFF_FFFF))
     }
 }

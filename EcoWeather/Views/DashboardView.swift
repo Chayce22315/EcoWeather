@@ -25,6 +25,8 @@ struct DashboardView: View {
     var body: some View {
         ZStack {
             WeatherSkyBackground(scene: effectiveScene)
+                .scaleEffect(1.18, anchor: .top)
+                .offset(y: -24)
             skyTintOverlay
             ScrollView {
                 VStack(spacing: 20) {
@@ -89,7 +91,7 @@ struct DashboardView: View {
             )
             Rectangle()
                 .fill(.thinMaterial)
-                .opacity(0.35)
+                .opacity(0.26)
         }
         .ignoresSafeArea()
         .animation(.easeInOut(duration: 0.6), value: appModel.decision?.recommendationLevel ?? -1)
