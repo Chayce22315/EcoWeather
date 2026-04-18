@@ -7,12 +7,15 @@ struct DashboardView: View {
     @State private var showDetail = false
     @State private var showDebug = false
 
+    private var useUS: Bool { Locale.current.measurementSystem == .us }
+
     var body: some View {
         ZStack {
             backgroundLayer
             ScrollView {
-                VStack(spacing: 24) {
-                    header
+                VStack(spacing: 20) {
+                    heroHeader
+                    tenDaySection
                     notificationSection
                     DecisionOrbView()
                         .onTapGesture {
@@ -35,7 +38,8 @@ struct DashboardView: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(appModel.isLoading)
                 }
-                .padding()
+                .padding(.horizontal)
+                .padding(.bottom, 24)
             }
             cornerDebugTriggers
         }
@@ -71,37 +75,125 @@ struct DashboardView: View {
         .animation(.easeInOut(duration: 0.6), value: appModel.decision?.recommendationLevel ?? -1)
     }
 
-    private var header: some View {
+    private var heroHeader: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("EcoWeather")
+            Text(cityHeadline)
                 .font(.largeTitle.bold())
-            Text(appModel.weather.locationStatusLine)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            if let w = appModel.weather.lastWeather {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(formattedOutdoor(fromCelsius: w.outdoorCelsius))
-                    Text("outside")
-                        .foregroundStyle(.secondary)
-                    if appModel.weatherStale {
-                        Text("Stale")
-                            .font(.caption2)
-                            .padding(4)
-                            .background(.yellow.opacity(0.3))
-                            .clipShape(Capsule())
-                    }
-                }
-                .font(.headline)
-            } else {
-                Text("Waiting for GPS + weather…")
+                .minimumScaleFactor(0.7)
+
+            if !appModel.weather.locationDetailLine.isEmpty {
+                Text(appModel.weather.locationDetailLine)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
+
+            if let w = appModel.weather.lastWeather {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(formattedOutdoor(fromCelsius: w.outdoorCelsius))
+                        .font(.system(size: 56, weight: .thin, design: .rounded))
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("now")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        if appModel.weatherStale {
+                            Text("Cached data")
+                                .font(.caption2)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(.yellow.opacity(0.35))
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+                Text(String(format: "Humidity %.0f%%", w.humidityPercent))
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            } else {
+                Text("Waiting for GPS + weather…")
+                    .font(.title2)
+                    .foregroundStyle(.secondary)
+            }
+
+            Text("EcoWeather")
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.quaternary)
+                .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 8)
+    }
+
+    private var cityHeadline: String {
+        let c = appModel.weather.cityDisplayName
+        if c.isEmpty || c == "Locating…" {
+            return "Locating…"
+        }
+        return c
+    }
+
+    private var tenDaySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Next 10 days — live forecast")
+                .font(.headline)
+            Text("Open-Meteo daily outlook at your GPS position. Updates when you refresh.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if appModel.weather.dailyForecast.isEmpty {
+                Text("Forecast loads after location and weather succeed.")
+                    .font(.subheadline)
+                    .foregroundStyle(.tertiary)
+                    .padding(.vertical, 8)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 10) {
+                        ForEach(appModel.weather.dailyForecast) { day in
+                            dayCard(day)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        }
+        .padding()
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func dayCard(_ day: DailyForecastDay) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(day.weekdayShort)
+                    .font(.caption.weight(.semibold))
+                Spacer()
+                Text(day.dayNumber)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            Image(systemName: DailyForecastDay.wmoSymbolName(code: day.weatherCode))
+                .font(.title2)
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.primary)
+                .frame(height: 28)
+            Text(day.highLowFormatted(useFahrenheit: useUS))
+                .font(.subheadline.weight(.semibold))
+            Text(day.predictionLine)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(4)
+        }
+        .frame(width: 132, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
+        )
     }
 
     private func formattedOutdoor(fromCelsius c: Double) -> String {
-        if Locale.current.measurementSystem == .us {
+        if useUS {
             let f = c * 9 / 5 + 32
             return String(format: "%.0f°F", f)
         }

@@ -22,6 +22,7 @@
 		E2000000000000000000000D /* DebugMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3000000000000000000000F /* DebugMenuView.swift */; };
 		E20000000000000000000010 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30000000000000000000013 /* AppDelegate.swift */; };
 		E20000000000000000000011 /* EcoNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30000000000000000000014 /* EcoNotificationService.swift */; };
+		E20000000000000000000012 /* DailyForecastDay.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30000000000000000000015 /* DailyForecastDay.swift */; };
 		E2000000000000000000000E /* build_metadata.json in Resources */ = {isa = PBXBuildFile; fileRef = E30000000000000000000011 /* build_metadata.json */; };
 		E2000000000000000000000F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E30000000000000000000012 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -44,6 +45,7 @@
 		E3000000000000000000000F /* DebugMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugMenuView.swift; sourceTree = "<group>"; };
 		E30000000000000000000013 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		E30000000000000000000014 /* EcoNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EcoNotificationService.swift; sourceTree = "<group>"; };
+		E30000000000000000000015 /* DailyForecastDay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyForecastDay.swift; sourceTree = "<group>"; };
 		E30000000000000000000010 /* EcoWeather-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "EcoWeather-Bridging-Header.h"; sourceTree = "<group>"; };
 		E30000000000000000000011 /* build_metadata.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = build_metadata.json; sourceTree = "<group>"; };
 		E30000000000000000000012 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -119,6 +121,7 @@
 			isa = PBXGroup;
 			children = (
 				E30000000000000000000009 /* BuildMetadata.swift */,
+				E30000000000000000000015 /* DailyForecastDay.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -237,6 +240,7 @@
 				E2000000000000000000000D /* DebugMenuView.swift in Sources */,
 				E20000000000000000000010 /* AppDelegate.swift in Sources */,
 				E20000000000000000000011 /* EcoNotificationService.swift in Sources */,
+				E20000000000000000000012 /* DailyForecastDay.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

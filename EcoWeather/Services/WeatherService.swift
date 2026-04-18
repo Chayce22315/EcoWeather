@@ -13,18 +13,22 @@ final class WeatherService: NSObject, ObservableObject {
     private let session: URLSession
     private let cacheURL: URL
     private let locationManager = CLLocationManager()
+    private let geocoder = CLGeocoder()
     private var locationContinuation: CheckedContinuation<CLLocationCoordinate2D?, Never>?
 
     @Published private(set) var lastWeather: CachedWeather?
     @Published private(set) var isStale: Bool = false
     @Published private(set) var lastError: String?
-    /// Human-readable line for the dashboard (e.g. coordinates when GPS is used).
-    @Published private(set) var locationStatusLine: String = "Locating…"
+    /// Reverse-geocoded place name, e.g. "DeKalb, IL"
+    @Published private(set) var cityDisplayName: String = ""
+    /// Human-readable coordinates under the city (e.g. 41.93° N, 88.75° W)
+    @Published private(set) var locationDetailLine: String = ""
+    /// 10-day daily forecast (Open-Meteo WMO codes)
+    @Published private(set) var dailyForecast: [DailyForecastDay] = []
 
     private(set) var lastCoordinate: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 0, longitude: 0)
     private(set) var hasValidCoordinate: Bool = false
 
-    /// Use for carbon API when today’s GPS failed — last saved fix, then Illinois default (not a random coast).
     var coordinateForCarbon: CLLocationCoordinate2D {
         if hasValidCoordinate {
             return lastCoordinate
@@ -79,38 +83,75 @@ final class WeatherService: NSObject, ObservableObject {
         await refreshWeather()
     }
 
-    /// Always hits the network (use after manual Refresh).
     func refreshWeather() async {
         lastError = nil
-        locationStatusLine = "Getting your location…"
+        dailyForecast = []
+        cityDisplayName = "Locating…"
+        locationDetailLine = ""
 
         guard let coordinate = await requestCoordinate() else {
             if lastError == nil {
                 lastError = "Location needed for live weather. Enable Location for EcoWeather in Settings."
             }
-            locationStatusLine = "Location unavailable"
+            cityDisplayName = "Location off"
             isStale = lastWeather != nil
             return
         }
 
         lastCoordinate = coordinate
         hasValidCoordinate = true
-        locationStatusLine = String(
-            format: "GPS · %.4f°, %.4f°",
-            coordinate.latitude,
-            coordinate.longitude
-        )
+        persistLastKnownCoordinate(coordinate)
+        locationDetailLine = Self.formatCoordinates(coordinate)
+
+        await updateCityName(for: coordinate)
 
         if let key = openWeatherMapKey, !key.isEmpty {
             await fetchOpenWeatherMap(coordinate: coordinate, apiKey: key)
+            await fetchOpenMeteoDailyOnly(coordinate: coordinate)
         } else {
-            await fetchOpenMeteo(coordinate: coordinate)
+            await fetchOpenMeteoCurrentAndDaily(coordinate: coordinate)
         }
     }
 
     private var openWeatherMapKey: String? {
         let k = UserDefaults.standard.string(forKey: "openweathermap_api_key")?.trimmingCharacters(in: .whitespacesAndNewlines)
         return (k?.isEmpty == false) ? k : nil
+    }
+
+    private func updateCityName(for coordinate: CLLocationCoordinate2D) async {
+        let loc = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        do {
+            let placemarks = try await geocoder.reverseGeocodeLocation(loc)
+            if let p = placemarks.first {
+                if let locality = p.locality {
+                    if let admin = p.administrativeArea {
+                        cityDisplayName = "\(locality), \(admin)"
+                    } else {
+                        cityDisplayName = locality
+                    }
+                } else if let name = p.name {
+                    cityDisplayName = name
+                } else {
+                    cityDisplayName = "Current location"
+                }
+            } else {
+                cityDisplayName = "Current location"
+            }
+        } catch {
+            cityDisplayName = "Weather location"
+        }
+    }
+
+    private static func formatCoordinates(_ c: CLLocationCoordinate2D) -> String {
+        let latH = c.latitude >= 0 ? "N" : "S"
+        let lonH = c.longitude >= 0 ? "E" : "W"
+        return String(
+            format: "%.2f° %@ · %.2f° %@",
+            abs(c.latitude),
+            latH,
+            abs(c.longitude),
+            lonH
+        )
     }
 
     private func fetchOpenWeatherMap(coordinate: CLLocationCoordinate2D, apiKey: String) async {
@@ -148,23 +189,20 @@ final class WeatherService: NSObject, ObservableObject {
             lastFetchAt = Date()
             isStale = false
             try saveDiskCache(decoded)
-            locationStatusLine = String(
-                format: "OpenWeather · GPS %.4f°, %.4f°",
-                coordinate.latitude,
-                coordinate.longitude
-            )
         } catch {
             lastError = error.localizedDescription
             isStale = lastWeather != nil
         }
     }
 
-    private func fetchOpenMeteo(coordinate: CLLocationCoordinate2D) async {
+    private func fetchOpenMeteoCurrentAndDaily(coordinate: CLLocationCoordinate2D) async {
         var components = URLComponents(string: "https://api.open-meteo.com/v1/forecast")!
         components.queryItems = [
             URLQueryItem(name: "latitude", value: String(coordinate.latitude)),
             URLQueryItem(name: "longitude", value: String(coordinate.longitude)),
             URLQueryItem(name: "current", value: "temperature_2m,relative_humidity_2m"),
+            URLQueryItem(name: "daily", value: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"),
+            URLQueryItem(name: "forecast_days", value: "10"),
             URLQueryItem(name: "timezone", value: "auto")
         ]
 
@@ -178,28 +216,97 @@ final class WeatherService: NSObject, ObservableObject {
             guard let http = response as? HTTPURLResponse, (200 ... 299).contains(http.statusCode) else {
                 throw URLError(.badServerResponse)
             }
-            let decoded = try parseOpenMeteoCurrent(data: data)
-            lastWeather = decoded
+            let (current, daily) = try parseOpenMeteoCombined(data: data)
+            lastWeather = current
+            dailyForecast = daily
             lastFetchAt = Date()
             isStale = false
-            try saveDiskCache(decoded)
-            locationStatusLine = String(
-                format: "Open-Meteo · GPS %.4f°, %.4f°",
-                coordinate.latitude,
-                coordinate.longitude
-            )
+            try saveDiskCache(current)
         } catch {
             lastError = error.localizedDescription
             isStale = lastWeather != nil
         }
     }
 
-    private func parseOpenMeteoCurrent(data: Data) throws -> CachedWeather {
+    private func fetchOpenMeteoDailyOnly(coordinate: CLLocationCoordinate2D) async {
+        var components = URLComponents(string: "https://api.open-meteo.com/v1/forecast")!
+        components.queryItems = [
+            URLQueryItem(name: "latitude", value: String(coordinate.latitude)),
+            URLQueryItem(name: "longitude", value: String(coordinate.longitude)),
+            URLQueryItem(name: "daily", value: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"),
+            URLQueryItem(name: "forecast_days", value: "10"),
+            URLQueryItem(name: "timezone", value: "auto")
+        ]
+
+        guard let url = components.url else { return }
+
+        do {
+            let (data, response) = try await session.data(from: url)
+            guard let http = response as? HTTPURLResponse, (200 ... 299).contains(http.statusCode) else { return }
+            let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            dailyForecast = parseDailyForecast(from: obj) ?? []
+        } catch {
+            #if DEBUG
+            print("Daily forecast fetch: \(error.localizedDescription)")
+            #endif
+        }
+    }
+
+    private func parseOpenMeteoCombined(data: Data) throws -> (CachedWeather, [DailyForecastDay]) {
         let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         let current = obj?["current"] as? [String: Any]
         let temp = doubleValue(current?["temperature_2m"]) ?? 0
         let humidity = doubleValue(current?["relative_humidity_2m"]) ?? 50
-        return CachedWeather(outdoorCelsius: temp, humidityPercent: humidity, fetchedAt: Date())
+        let weather = CachedWeather(outdoorCelsius: temp, humidityPercent: humidity, fetchedAt: Date())
+        let daily = parseDailyForecast(from: obj) ?? []
+        return (weather, daily)
+    }
+
+    private func parseDailyForecast(from obj: [String: Any]?) -> [DailyForecastDay]? {
+        guard let obj,
+              let daily = obj["daily"] as? [String: Any],
+              let timeStrings = daily["time"] as? [String]
+        else { return nil }
+
+        let codes = intArray(from: daily["weather_code"]) ?? []
+        let maxT = doubleArray(from: daily["temperature_2m_max"]) ?? []
+        let minT = doubleArray(from: daily["temperature_2m_min"]) ?? []
+        let precip = intArray(from: daily["precipitation_probability_max"]) ?? []
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withFullDate]
+
+        var result: [DailyForecastDay] = []
+        for i in 0 ..< min(timeStrings.count, 10) {
+            guard let date = formatter.date(from: timeStrings[i]) else { continue }
+            let code = i < codes.count ? codes[i] : 2
+            let hi = i < maxT.count ? maxT[i] : 0
+            let lo = i < minT.count ? minT[i] : 0
+            let pr = i < precip.count ? precip[i] : 0
+            result.append(
+                DailyForecastDay(
+                    id: timeStrings[i],
+                    date: date,
+                    tempMaxC: hi,
+                    tempMinC: lo,
+                    precipProb: pr,
+                    weatherCode: code
+                )
+            )
+        }
+        return result
+    }
+
+    private func intArray(from any: Any?) -> [Int]? {
+        if let a = any as? [Int] { return a }
+        if let a = any as? [Double] { return a.map { Int($0.rounded()) } }
+        return nil
+    }
+
+    private func doubleArray(from any: Any?) -> [Double]? {
+        if let a = any as? [Double] { return a }
+        if let a = any as? [Int] { return a.map { Double($0) } }
+        return nil
     }
 
     private func doubleValue(_ any: Any?) -> Double? {
@@ -287,14 +394,7 @@ extension WeatherService: CLLocationManagerDelegate {
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         Task { @MainActor in
-            switch manager.authorizationStatus {
-            case .authorizedAlways, .authorizedWhenInUse:
-                break
-            case .denied, .restricted:
-                break
-            default:
-                break
-            }
+            _ = manager.authorizationStatus
         }
     }
 }
